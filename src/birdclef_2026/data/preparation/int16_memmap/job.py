@@ -1,6 +1,6 @@
 import modal
 
-from birdclef_2026.data.preparation.pipeline import run_pipeline
+from birdclef_2026.data.preparation.int16_memmap.utils import run_pipeline
 
 app = modal.App("birdclef-2026-memmap")
 

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 
-from birdclef_2026.data.preparation.pipeline import (
+from birdclef_2026.data.preparation.int16_memmap.utils import (
     build_index,
     decode_to_int16,
     filter_by_min_duration,

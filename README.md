@@ -27,5 +27,13 @@ modal run src/birdclef_2026/data/preparation/raw.py
 Reads the zip, decodes all audio to int16, writes the memmap and index, then commits the `birdclef-2026-processed` volume.
 
 ```bash
-modal run src/birdclef_2026/data/preparation/memmap.py
+modal run src/birdclef_2026/data/preparation/int16_memmap/job.py
+```
+
+**3. Verify the processed dataset**
+
+Runs structural checks and spot-checks a sample of audio slices against the original OGG files.
+
+```bash
+modal run src/birdclef_2026/data/preparation/int16_memmap/verify.py
 ```
