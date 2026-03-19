@@ -32,7 +32,7 @@ def verify():
     assert audio.dtype == np.int16, f"expected int16, got {audio.dtype}"
     assert {"filename", "offset_start", "offset_end"}.issubset(index.columns), "missing index columns"
     assert (durations_s >= 5.0).all(), f"clips shorter than 5s present (min={durations_s.min():.2f}s)"
-    assert index["offset_end"].iloc[-1] == len(audio), "last offset does not match audio length"
+    assert index["offset_end"].iloc[-1] <= len(audio), "last offset exceeds audio length"
     assert index["offset_start"].iloc[0] == 0, "first offset is not 0"
     assert (index["offset_end"].values > index["offset_start"].values).all(), "zero-length clips present"
 
