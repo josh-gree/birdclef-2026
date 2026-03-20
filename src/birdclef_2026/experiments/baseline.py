@@ -27,6 +27,7 @@ class BirdCLEFBaseline(Experiment):
         epochs: int = 10
         val_fraction: float = 0.1
         max_samples_per_split: int | None = None  # set small (e.g. 64) for a smoke run
+        hidden_size: int = 512
 
     @staticmethod
     def run(config: "BirdCLEFBaseline.Config", wandb_run) -> None:
@@ -79,14 +80,18 @@ class BirdCLEFBaseline(Experiment):
 
         transform = build_spectrogram_pipeline().to(device)
 
-        # Frozen EfficientNet-B3 backbone with 1-channel input, linear head
+        # Frozen EfficientNet-B3 backbone with 1-channel input, MLP head
         backbone = timm.create_model(
             "efficientnet_b3", pretrained=True, in_chans=1, num_classes=0
         )
         for param in backbone.parameters():
             param.requires_grad = False
         backbone_features = backbone.num_features
-        head = nn.Linear(backbone_features, n_classes)
+        head = nn.Sequential(
+            nn.Linear(backbone_features, config.hidden_size),
+            nn.ReLU(),
+            nn.Linear(config.hidden_size, n_classes),
+        )
         model = nn.Sequential(backbone, head).to(device)
 
         optimizer = torch.optim.Adam(head.parameters(), lr=config.lr)
