@@ -30,12 +30,14 @@ class RandomWindowDataset(Dataset):
         audio_path: str,
         index_path: str,
         indices: list[int] | None = None,
+        seed: int | None = None,
     ):
         self.audio = np.load(audio_path, mmap_mode="r")
         index = pd.read_parquet(index_path)
         if indices is not None:
             index = index.iloc[indices].reset_index(drop=True)
         self.index = index
+        self.seed = seed
 
     def __len__(self) -> int:
         return len(self.index)
@@ -44,7 +46,11 @@ class RandomWindowDataset(Dataset):
         row = self.index.iloc[i]
         clip_len = row.offset_end - row.offset_start
         max_start = clip_len - WINDOW_SAMPLES
-        start = np.random.randint(0, max_start + 1)
+        if self.seed is not None:
+            rng = np.random.default_rng(self.seed + i)
+            start = int(rng.integers(0, max_start + 1))
+        else:
+            start = np.random.randint(0, max_start + 1)
         window = self.audio[row.offset_start + start : row.offset_start + start + WINDOW_SAMPLES]
         waveform = torch.from_numpy(window.astype(np.float32) / 32767.0)
         return waveform, row.primary_label

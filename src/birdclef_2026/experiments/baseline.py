@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from torch.utils.data import DataLoader
 from wm import Experiment
 
-from birdclef_2026.data.dataset import RandomWindowDataset, StridedWindowDataset
+from birdclef_2026.data.dataset import RandomWindowDataset
 from birdclef_2026.data.transforms import build_spectrogram_pipeline
 
 
@@ -60,7 +60,7 @@ class BirdCLEFBaseline(Experiment):
         train_dataset = RandomWindowDataset(
             audio_path, index_path, indices=train_indices
         )
-        val_dataset = StridedWindowDataset(audio_path, index_path, indices=val_indices)
+        val_dataset = RandomWindowDataset(audio_path, index_path, indices=val_indices, seed=0)
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
