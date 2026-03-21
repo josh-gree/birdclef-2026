@@ -170,6 +170,220 @@ class Resize(nn.Module):
         return F.interpolate(x, size=self.size, mode="bilinear", align_corners=False)
 
 
+class FrequencyMask(nn.Module):
+    """Mask one or more contiguous frequency bands in a spectrogram.
+
+    Applied only during training (no-op at eval time). Each mask stripe is
+    applied independently with probability ``p``.
+
+    Parameters
+    ----------
+    max_mask_size : int
+        Maximum number of frequency bins to mask per mask stripe.
+    num_masks : int
+        Number of independent frequency masks to attempt.
+    p : float
+        Probability of applying each individual mask stripe.
+    fill_value : float
+        Value to fill masked regions with.
+    """
+
+    def __init__(
+        self,
+        max_mask_size: int,
+        num_masks: int = 1,
+        p: float = 0.5,
+        fill_value: float = 0.0,
+    ):
+        super().__init__()
+        self.max_mask_size = max_mask_size
+        self.num_masks = num_masks
+        self.p = p
+        self.fill_value = fill_value
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            Shape ``(..., freq, time)``, float32.
+
+        Returns
+        -------
+        torch.Tensor
+            Same shape as input with frequency bands zeroed out.
+        """
+        if not self.training:
+            return x
+        x = x.clone()
+        n_freq = x.shape[-2]
+        for _ in range(self.num_masks):
+            if torch.rand(()).item() > self.p:
+                continue
+            mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
+            start = torch.randint(0, max(1, n_freq - mask_size + 1), ()).item()
+            x[..., start : start + mask_size, :] = self.fill_value
+        return x
+
+
+class TimeMask(nn.Module):
+    """Mask one or more contiguous time bands in a spectrogram.
+
+    Applied only during training (no-op at eval time). Each mask stripe is
+    applied independently with probability ``p``.
+
+    Parameters
+    ----------
+    max_mask_size : int
+        Maximum number of time frames to mask per mask stripe.
+    num_masks : int
+        Number of independent time masks to attempt.
+    p : float
+        Probability of applying each individual mask stripe.
+    fill_value : float
+        Value to fill masked regions with.
+    """
+
+    def __init__(
+        self,
+        max_mask_size: int,
+        num_masks: int = 1,
+        p: float = 0.5,
+        fill_value: float = 0.0,
+    ):
+        super().__init__()
+        self.max_mask_size = max_mask_size
+        self.num_masks = num_masks
+        self.p = p
+        self.fill_value = fill_value
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            Shape ``(..., freq, time)``, float32.
+
+        Returns
+        -------
+        torch.Tensor
+            Same shape as input with time bands zeroed out.
+        """
+        if not self.training:
+            return x
+        x = x.clone()
+        n_time = x.shape[-1]
+        for _ in range(self.num_masks):
+            if torch.rand(()).item() > self.p:
+                continue
+            mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
+            start = torch.randint(0, max(1, n_time - mask_size + 1), ()).item()
+            x[..., start : start + mask_size] = self.fill_value
+        return x
+
+
+class RectangleMask(nn.Module):
+    """Apply one or more random rectangular masks to a spectrogram.
+
+    Each mask is independently sized, positioned, and gated by probability
+    ``p``. Applied only during training (no-op at eval time).
+
+    Parameters
+    ----------
+    max_freq_size : int
+        Maximum height (frequency bins) of each rectangle.
+    max_time_size : int
+        Maximum width (time frames) of each rectangle.
+    num_masks : int
+        Number of independent rectangles to attempt.
+    p : float
+        Probability of applying each individual rectangle.
+    fill_value : float
+        Value to fill masked regions with.
+    """
+
+    def __init__(
+        self,
+        max_freq_size: int,
+        max_time_size: int,
+        num_masks: int = 1,
+        p: float = 0.5,
+        fill_value: float = 0.0,
+    ):
+        super().__init__()
+        self.max_freq_size = max_freq_size
+        self.max_time_size = max_time_size
+        self.num_masks = num_masks
+        self.p = p
+        self.fill_value = fill_value
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            Shape ``(..., freq, time)``, float32.
+
+        Returns
+        -------
+        torch.Tensor
+            Same shape as input with rectangular regions zeroed out.
+        """
+        if not self.training:
+            return x
+        x = x.clone()
+        n_freq, n_time = x.shape[-2], x.shape[-1]
+        for _ in range(self.num_masks):
+            if torch.rand(()).item() > self.p:
+                continue
+            fh = torch.randint(1, self.max_freq_size + 1, ()).item()
+            fw = torch.randint(1, self.max_time_size + 1, ()).item()
+            f0 = torch.randint(0, max(1, n_freq - fh + 1), ()).item()
+            t0 = torch.randint(0, max(1, n_time - fw + 1), ()).item()
+            x[..., f0 : f0 + fh, t0 : t0 + fw] = self.fill_value
+        return x
+
+
+class GaussianNoise(nn.Module):
+    """Add random Gaussian noise to a spectrogram.
+
+    Applied only during training (no-op at eval time).
+
+    Parameters
+    ----------
+    min_std : float
+        Minimum standard deviation of the noise.
+    max_std : float
+        Maximum standard deviation of the noise. The actual std is sampled
+        uniformly from ``[min_std, max_std]`` each forward pass.
+    p : float
+        Probability of applying the noise.
+    """
+
+    def __init__(self, min_std: float = 0.0, max_std: float = 0.05, p: float = 0.5):
+        super().__init__()
+        self.min_std = min_std
+        self.max_std = max_std
+        self.p = p
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Parameters
+        ----------
+        x : torch.Tensor
+            Shape ``(..., freq, time)``, float32.
+
+        Returns
+        -------
+        torch.Tensor
+            Same shape as input with Gaussian noise added.
+        """
+        if not self.training or torch.rand(()).item() > self.p:
+            return x
+        std = self.min_std + torch.rand(()).item() * (self.max_std - self.min_std)
+        return x + torch.randn_like(x) * std
+
+
 def build_spectrogram_pipeline(
     sample_rate: int = 32000,
     n_fft: int = 2048,

@@ -27,6 +27,7 @@ def train_n_steps(
     checkpoint_dir = run_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     model.train()
+    transform.train()
     t0 = time.perf_counter()
     val_step = 0
     for step, (waveforms, label_strings) in enumerate(train_iter):
@@ -63,6 +64,7 @@ def train_n_steps(
             )
             val_step += 1
             model.train()
+            transform.train()
 
 
 def _eval(
@@ -77,6 +79,7 @@ def _eval(
     wandb_run,
 ) -> None:
     model.eval()
+    transform.eval()
     total_loss, correct1, correct5, total = 0.0, 0, 0, 0
     all_logits, all_targets = [], []
     with torch.no_grad():
