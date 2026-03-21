@@ -217,12 +217,13 @@ class FrequencyMask(nn.Module):
             return x
         x = x.clone()
         n_freq = x.shape[-2]
-        for _ in range(self.num_masks):
-            if torch.rand(()).item() > self.p:
-                continue
-            mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
-            start = torch.randint(0, max(1, n_freq - mask_size + 1), ()).item()
-            x[..., start : start + mask_size, :] = self.fill_value
+        for b in range(x.shape[0]):
+            for _ in range(self.num_masks):
+                if torch.rand(()).item() > self.p:
+                    continue
+                mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
+                start = torch.randint(0, max(1, n_freq - mask_size + 1), ()).item()
+                x[b, ..., start : start + mask_size, :] = self.fill_value
         return x
 
 
@@ -273,12 +274,13 @@ class TimeMask(nn.Module):
             return x
         x = x.clone()
         n_time = x.shape[-1]
-        for _ in range(self.num_masks):
-            if torch.rand(()).item() > self.p:
-                continue
-            mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
-            start = torch.randint(0, max(1, n_time - mask_size + 1), ()).item()
-            x[..., start : start + mask_size] = self.fill_value
+        for b in range(x.shape[0]):
+            for _ in range(self.num_masks):
+                if torch.rand(()).item() > self.p:
+                    continue
+                mask_size = torch.randint(1, self.max_mask_size + 1, ()).item()
+                start = torch.randint(0, max(1, n_time - mask_size + 1), ()).item()
+                x[b, ..., start : start + mask_size] = self.fill_value
         return x
 
 
@@ -333,14 +335,15 @@ class RectangleMask(nn.Module):
             return x
         x = x.clone()
         n_freq, n_time = x.shape[-2], x.shape[-1]
-        for _ in range(self.num_masks):
-            if torch.rand(()).item() > self.p:
-                continue
-            fh = torch.randint(1, self.max_freq_size + 1, ()).item()
-            fw = torch.randint(1, self.max_time_size + 1, ()).item()
-            f0 = torch.randint(0, max(1, n_freq - fh + 1), ()).item()
-            t0 = torch.randint(0, max(1, n_time - fw + 1), ()).item()
-            x[..., f0 : f0 + fh, t0 : t0 + fw] = self.fill_value
+        for b in range(x.shape[0]):
+            for _ in range(self.num_masks):
+                if torch.rand(()).item() > self.p:
+                    continue
+                fh = torch.randint(1, self.max_freq_size + 1, ()).item()
+                fw = torch.randint(1, self.max_time_size + 1, ()).item()
+                f0 = torch.randint(0, max(1, n_freq - fh + 1), ()).item()
+                t0 = torch.randint(0, max(1, n_time - fw + 1), ()).item()
+                x[b, ..., f0 : f0 + fh, t0 : t0 + fw] = self.fill_value
         return x
 
 
