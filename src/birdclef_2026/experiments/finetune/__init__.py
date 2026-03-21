@@ -8,7 +8,12 @@ from pydantic import BaseModel, model_validator
 from wm import Experiment
 
 from birdclef_2026.data.loaders import build_dataloaders
-from birdclef_2026.data.transforms import build_spectrogram_pipeline
+from birdclef_2026.data.transforms import (
+    FrequencyMask,
+    GaussianNoise,
+    TimeMask,
+    build_spectrogram_pipeline,
+)
 from birdclef_2026.experiments.baseline.model import (
     build_efficientnet_b3_backbone,
     build_head,
@@ -35,6 +40,7 @@ class BirdCLEFFinetune(Experiment):
         weight_decay: float = 0.0
         balance_train: bool = False
         unfreeze_blocks: int = 2
+        use_augmentation: bool = False
 
         @model_validator(mode="after")
         def _exactly_one_stopping_criterion(self):
@@ -62,7 +68,16 @@ class BirdCLEFFinetune(Experiment):
         )
         n_classes = len(label2idx)
 
-        transform = build_spectrogram_pipeline().to(device)
+        augmentations = (
+            nn.Sequential(
+                FrequencyMask(max_mask_size=20, num_masks=2, p=0.5),
+                TimeMask(max_mask_size=40, num_masks=2, p=0.5),
+                GaussianNoise(min_std=0.0, max_std=0.05, p=0.5),
+            )
+            if config.use_augmentation
+            else nn.Identity()
+        )
+        transform = nn.Sequential(build_spectrogram_pipeline(), augmentations).to(device)
 
         backbone = build_efficientnet_b3_backbone(unfreeze_blocks=config.unfreeze_blocks)
         head = build_head(backbone.num_features, n_classes, config.dropout)
