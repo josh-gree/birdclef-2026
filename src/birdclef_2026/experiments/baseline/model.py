@@ -12,12 +12,9 @@ def build_frozen_efficientnet_b3_backbone() -> nn.Module:
     return backbone
 
 
-def build_mlp_head(
-    in_features: int, n_classes: int, hidden_size: int = 512
-) -> nn.Module:
-    """2-layer MLP classification head."""
+def build_head(in_features: int, n_classes: int, dropout: float = 0.0) -> nn.Module:
+    """Classification head: Dropout → Linear."""
     return nn.Sequential(
-        nn.Linear(in_features, hidden_size),
-        nn.ReLU(),
-        nn.Linear(hidden_size, n_classes),
+        nn.Dropout(dropout),
+        nn.Linear(in_features, n_classes),
     )

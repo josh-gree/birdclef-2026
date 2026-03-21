@@ -2700,7 +2700,7 @@ wheels = [
 [[package]]
 name = "wm"
 version = "0.1.0"
-source = { git = "https://github.com/josh-gree/wm.git#50da7e95544e7e1e356394efedd8100c0d45d7c9" }
+source = { git = "https://github.com/josh-gree/wm.git#762e976f7fb4018467b9cb1e89c10617b5f3c8dc" }
 dependencies = [
     { name = "click" },
     { name = "modal" },

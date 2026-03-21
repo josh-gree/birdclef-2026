@@ -6,7 +6,6 @@ import torch
 from birdclef_2026.data.dataset import (
     WINDOW_SAMPLES,
     RandomWindowDataset,
-    StridedWindowDataset,
 )
 
 
@@ -136,72 +135,3 @@ def test_random_indices_subset(two_clips):
     _, label = ds[0]
     assert label == "robin"
 
-
-# ---------------------------------------------------------------------------
-# StridedWindowDataset
-# ---------------------------------------------------------------------------
-
-def test_strided_len_equals_total_windows(two_clips):
-    """__len__ equals the total number of pre-computed strided windows.
-
-    Why: val DataLoader batches over windows, not files; an incorrect length
-    would truncate or repeat the validation pass.
-    """
-    audio_path, index_path, _ = two_clips
-    ds = StridedWindowDataset(audio_path, index_path)
-    # 2 clips × 2 windows each (each clip is 2 × WINDOW_SAMPLES) = 4
-    assert len(ds) == 4
-
-
-def test_strided_getitem_shape_dtype_label(two_clips):
-    """__getitem__ returns a float32 tensor of WINDOW_SAMPLES length and a string label.
-
-    Why: same contract as RandomWindowDataset — transforms and the model
-    require a fixed-length float32 input; mismatches cause silent errors.
-    """
-    audio_path, index_path, _ = two_clips
-    ds = StridedWindowDataset(audio_path, index_path)
-    waveform, label = ds[0]
-    assert waveform.dtype == torch.float32
-    assert waveform.shape == (WINDOW_SAMPLES,)
-    assert isinstance(label, str)
-
-
-def test_strided_deterministic(two_clips):
-    """The same index always returns the same window across multiple calls.
-
-    Why: reproducible validation metrics require that window boundaries are
-    fixed; non-determinism would make val loss noisy and unreliable.
-    """
-    audio_path, index_path, _ = two_clips
-    ds = StridedWindowDataset(audio_path, index_path)
-    w1, _ = ds[0]
-    w2, _ = ds[0]
-    assert torch.equal(w1, w2)
-
-
-def test_strided_short_clip_produces_no_windows(short_and_exact):
-    """Clips shorter than WINDOW_SAMPLES contribute zero windows to the dataset.
-
-    Why: attempting to slice a window from a clip that is too short would read
-    past the end of the clip into the next file's audio; the pre-compute step
-    must skip these clips entirely.
-    """
-    audio_path, index_path, _ = short_and_exact
-    ds = StridedWindowDataset(audio_path, index_path)
-    assert len(ds) == 1
-    _, label = ds[0]
-    assert label == "exact"
-
-
-def test_strided_indices_subset(two_clips):
-    """Passing indices= restricts pre-computed windows to the specified rows only.
-
-    Why: val split is defined by a row-level index list; if the subset is
-    ignored, the val set would include training files.
-    """
-    audio_path, index_path, _ = two_clips
-    ds = StridedWindowDataset(audio_path, index_path, indices=[0])
-    assert len(ds) == 2
-    _, label = ds[0]
-    assert label == "sparrow"

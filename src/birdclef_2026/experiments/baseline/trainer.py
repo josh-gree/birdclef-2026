@@ -1,30 +1,40 @@
 import time
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from birdclef_2026.experiments.baseline.metrics import topk_correct
+from birdclef_2026.experiments.baseline.metrics import macro_roc_auc, topk_correct
 
 
-def train_one_epoch(
+def train_n_steps(
     model: nn.Module,
-    loader: DataLoader,
+    train_iter,
+    val_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
     transform: nn.Module,
     device: torch.device,
     label2idx: dict[str, int],
     batch_size: int,
-    epoch: int,
-    n_epochs: int,
+    total_steps: int | None,
+    total_val_rounds: int | None,
+    val_every: int,
     wandb_run,
-    step: int,
-) -> int:
+    run_dir: Path,
+) -> None:
+    checkpoint_dir = run_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
     model.train()
     t0 = time.perf_counter()
-    n_batches = len(loader)
-    for batch_idx, (waveforms, label_strings) in enumerate(loader):
+    val_step = 0
+    for step, (waveforms, label_strings) in enumerate(train_iter):
+        if total_steps is not None and step >= total_steps:
+            break
+        if total_val_rounds is not None and val_step >= total_val_rounds:
+            break
+
         waveforms = waveforms.to(device)
         targets = torch.tensor([label2idx[label] for label in label_strings], device=device)
 
@@ -39,29 +49,36 @@ def train_one_epoch(
         optimizer.step()
 
         wandb_run.log({"batch_loss": loss.item(), "batch_step": step})
-        step += 1
 
-        if (batch_idx + 1) % 100 == 0:
+        if (step + 1) % 100 == 0:
             elapsed = time.perf_counter() - t0
-            rate = (batch_idx + 1) * batch_size / elapsed
-            eta = (n_batches - (batch_idx + 1)) * batch_size / rate
-            print(
-                f"  epoch {epoch}/{n_epochs} batch {batch_idx + 1}/{n_batches} — loss {loss.item():.4f} — {rate:.0f} samples/s — ETA {eta:.0f}s"
+            rate = (step + 1) * batch_size / elapsed
+            print(f"  step {step + 1} val_round {val_step} — loss {loss.item():.4f} — {rate:.0f} samples/s")
+
+        if (step + 1) % val_every == 0:
+            _eval(model, val_loader, criterion, transform, device, label2idx, step + 1, val_step, wandb_run)
+            torch.save(
+                {"val_step": val_step, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()},
+                checkpoint_dir / f"val_{val_step:04d}.pt",
             )
+            val_step += 1
+            model.train()
 
-    return step
 
-
-def eval_one_epoch(
+def _eval(
     model: nn.Module,
     loader: DataLoader,
     criterion: nn.Module,
     transform: nn.Module,
     device: torch.device,
     label2idx: dict[str, int],
-) -> dict[str, float]:
+    step: int,
+    val_step: int,
+    wandb_run,
+) -> None:
     model.eval()
     total_loss, correct1, correct5, total = 0.0, 0, 0, 0
+    all_logits, all_targets = [], []
     with torch.no_grad():
         for waveforms, label_strings in loader:
             waveforms = waveforms.to(device)
@@ -73,8 +90,17 @@ def eval_one_epoch(
             correct1 += topk_correct(logits, targets, k=1)
             correct5 += topk_correct(logits, targets, k=5)
             total += len(targets)
-    return {
+            all_logits.append(logits.cpu())
+            all_targets.append(targets.cpu())
+    roc_auc = macro_roc_auc(torch.cat(all_logits), torch.cat(all_targets), n_classes=len(label2idx))
+    metrics = {
         "val_loss": total_loss / total,
         "val_acc1": correct1 / total,
         "val_acc5": correct5 / total,
+        "val_roc_auc": roc_auc,
+        "val_step": val_step,
     }
+    print(
+        f"Val {val_step} (step {step}) — val_loss: {metrics['val_loss']:.4f} — acc@1: {metrics['val_acc1']:.4f} — acc@5: {metrics['val_acc5']:.4f} — roc_auc: {roc_auc:.4f}"
+    )
+    wandb_run.log(metrics)
