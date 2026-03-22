@@ -1,5 +1,6 @@
 import modal
 
+from birdclef_2026.data.preparation.int16_memmap.soundscapes import run_soundscape_pipeline
 from birdclef_2026.data.preparation.int16_memmap.utils import run_pipeline
 
 app = modal.App("birdclef-2026-memmap")
@@ -22,6 +23,33 @@ image = (
 )
 def build_dataset():
     run_pipeline("/raw/birdclef-2026.zip", "/processed/audio.npy", "/processed/index.parquet")
+    processed_volume.commit()
+
+
+@app.function(
+    image=image,
+    volumes={"/raw": raw_volume, "/processed": processed_volume},
+    timeout=3600,
+)
+def build_soundscape_dataset():
+    run_soundscape_pipeline(
+        "/raw/birdclef-2026.zip",
+        "/processed/soundscape_audio.npy",
+        "/processed/soundscape_index.parquet",
+    )
+    processed_volume.commit()
+
+
+@app.function(
+    image=image,
+    volumes={"/raw": raw_volume, "/processed": processed_volume},
+    timeout=300,
+)
+def extract_taxonomy():
+    import zipfile
+
+    with zipfile.ZipFile("/raw/birdclef-2026.zip") as zf:
+        zf.extract("taxonomy.csv", "/processed")
     processed_volume.commit()
 
 

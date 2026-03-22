@@ -5,18 +5,17 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from birdclef_2026.experiments.baseline.metrics import macro_roc_auc, topk_correct
+from birdclef_2026.experiments.baseline.metrics import macro_roc_auc
 
 
 def train_n_steps(
     model: nn.Module,
     train_iter,
-    val_loader: DataLoader,
+    val_loaders: dict[str, DataLoader],
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
     transform: nn.Module,
     device: torch.device,
-    label2idx: dict[str, int],
     batch_size: int,
     total_steps: int | None,
     total_val_rounds: int | None,
@@ -30,14 +29,14 @@ def train_n_steps(
     transform.train()
     t0 = time.perf_counter()
     val_step = 0
-    for step, (waveforms, label_strings) in enumerate(train_iter):
+    for step, (waveforms, targets) in enumerate(train_iter):
         if total_steps is not None and step >= total_steps:
             break
         if total_val_rounds is not None and val_step >= total_val_rounds:
             break
 
         waveforms = waveforms.to(device)
-        targets = torch.tensor([label2idx[label] for label in label_strings], device=device)
+        targets = targets.to(device)
 
         with torch.no_grad():
             images = transform(waveforms)
@@ -49,7 +48,17 @@ def train_n_steps(
         loss.backward()
         optimizer.step()
 
-        wandb_run.log({"batch_loss": loss.item(), "batch_step": step})
+        with torch.no_grad():
+            pos_mask = targets.bool()
+            mean_pos_logit = logits[pos_mask].mean().item()
+            mean_neg_logit = logits[~pos_mask].mean().item()
+
+        wandb_run.log({
+            "batch_loss": loss.item(),
+            "mean_pos_logit": mean_pos_logit,
+            "mean_neg_logit": mean_neg_logit,
+            "batch_step": step,
+        })
 
         if (step + 1) % 100 == 0:
             elapsed = time.perf_counter() - t0
@@ -57,7 +66,7 @@ def train_n_steps(
             print(f"  step {step + 1} val_round {val_step} — loss {loss.item():.4f} — {rate:.0f} samples/s")
 
         if (step + 1) % val_every == 0:
-            _eval(model, val_loader, criterion, transform, device, label2idx, step + 1, val_step, wandb_run)
+            _eval_all(model, val_loaders, criterion, transform, device, step + 1, val_step, wandb_run)
             torch.save(
                 {"val_step": val_step, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()},
                 checkpoint_dir / f"val_{val_step:04d}.pt",
@@ -67,43 +76,36 @@ def train_n_steps(
             transform.train()
 
 
-def _eval(
+def _eval_all(
     model: nn.Module,
-    loader: DataLoader,
+    val_loaders: dict[str, DataLoader],
     criterion: nn.Module,
     transform: nn.Module,
     device: torch.device,
-    label2idx: dict[str, int],
     step: int,
     val_step: int,
     wandb_run,
 ) -> None:
     model.eval()
     transform.eval()
-    total_loss, correct1, correct5, total = 0.0, 0, 0, 0
-    all_logits, all_targets = [], []
-    with torch.no_grad():
-        for waveforms, label_strings in loader:
-            waveforms = waveforms.to(device)
-            targets = torch.tensor([label2idx[label] for label in label_strings], device=device)
-            images = transform(waveforms)
-            logits = model(images)
-            loss = criterion(logits, targets)
-            total_loss += loss.item() * len(targets)
-            correct1 += topk_correct(logits, targets, k=1)
-            correct5 += topk_correct(logits, targets, k=5)
-            total += len(targets)
-            all_logits.append(logits.cpu())
-            all_targets.append(targets.cpu())
-    roc_auc = macro_roc_auc(torch.cat(all_logits), torch.cat(all_targets), n_classes=len(label2idx))
-    metrics = {
-        "val_loss": total_loss / total,
-        "val_acc1": correct1 / total,
-        "val_acc5": correct5 / total,
-        "val_roc_auc": roc_auc,
-        "val_step": val_step,
-    }
-    print(
-        f"Val {val_step} (step {step}) — val_loss: {metrics['val_loss']:.4f} — acc@1: {metrics['val_acc1']:.4f} — acc@5: {metrics['val_acc5']:.4f} — roc_auc: {roc_auc:.4f}"
-    )
+    metrics = {"val_step": val_step}
+    for name, loader in val_loaders.items():
+        prefix = f"val_{name}"
+        total_loss, total = 0.0, 0
+        all_logits, all_targets = [], []
+        with torch.no_grad():
+            for waveforms, targets in loader:
+                waveforms = waveforms.to(device)
+                targets = targets.to(device)
+                images = transform(waveforms)
+                logits = model(images)
+                loss = criterion(logits, targets)
+                total_loss += loss.item() * len(targets)
+                total += len(targets)
+                all_logits.append(logits.cpu())
+                all_targets.append(targets.cpu())
+        roc_auc = macro_roc_auc(torch.cat(all_logits), torch.cat(all_targets))
+        metrics[f"{prefix}_loss"] = total_loss / total
+        metrics[f"{prefix}_roc_auc"] = roc_auc
+        print(f"  {prefix} (step {step}, round {val_step}) — loss: {total_loss / total:.4f} — roc_auc: {roc_auc:.4f}")
     wandb_run.log(metrics)

@@ -1,0 +1,13 @@
+{
+  "id": "joshgreen/birdclef-2026-submission",
+  "title": "BirdCLEF 2026 Submission",
+  "code_file": "submission.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": ["birdclef-2026"],
+  "kernel_sources": ["joshgreen/birdclef-2026-wheels"],
+  "dataset_sources": ["joshgreen/birdclef-2026-checkpoint"]
+}
