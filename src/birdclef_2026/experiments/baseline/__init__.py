@@ -15,8 +15,10 @@ from birdclef_2026.data.transforms import (
     build_spectrogram_pipeline,
 )
 from birdclef_2026.experiments.baseline.model import (
+    build_backbone,
     build_efficientnet_b3_backbone,
     build_head,
+    get_image_size,
 )
 from birdclef_2026.experiments.baseline.trainer import train_n_steps
 
@@ -42,6 +44,7 @@ class BirdCLEFBaseline(Experiment):
         weight_decay: float = 0.0
         unfreeze_blocks: int = 0
         backbone_lr: float = 1e-5
+        backbone_name: str = "efficientnet_b3"
         resume_from: str | None = None
         use_augmentation: bool = False
 
@@ -75,6 +78,14 @@ class BirdCLEFBaseline(Experiment):
         )
         n_classes = len(label2idx)
 
+        if config.backbone_name == "efficientnet_b3":
+            img_h, img_w = 256, 256  # preserve original training size
+            backbone = build_efficientnet_b3_backbone(unfreeze_blocks=config.unfreeze_blocks)
+        else:
+            img_h, img_w = get_image_size(config.backbone_name)
+            backbone = build_backbone(config.backbone_name, unfreeze_blocks=config.unfreeze_blocks)
+        print(f"Backbone: {config.backbone_name}, image size: {img_h}x{img_w}")
+
         augmentations = (
             nn.Sequential(
                 FrequencyMask(max_mask_size=20, num_masks=2, p=0.5),
@@ -84,9 +95,9 @@ class BirdCLEFBaseline(Experiment):
             if config.use_augmentation
             else nn.Identity()
         )
-        transform = nn.Sequential(build_spectrogram_pipeline(), augmentations).to(device)
-
-        backbone = build_efficientnet_b3_backbone(unfreeze_blocks=config.unfreeze_blocks)
+        transform = nn.Sequential(
+            build_spectrogram_pipeline(height=img_h, width=img_w), augmentations
+        ).to(device)
         head = build_head(backbone.num_features, n_classes, config.dropout, config.hidden)
         model = nn.Sequential(backbone, head).to(device)
 

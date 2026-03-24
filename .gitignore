@@ -4,4 +4,5 @@ __pycache__/
 scratch/
 *.egg-info/
 dist/
-.python-version
+
+.vscode

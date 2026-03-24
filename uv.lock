@@ -3790,9 +3790,10 @@ wheels = [
 [[package]]
 name = "wm"
 version = "0.1.0"
-source = { git = "https://github.com/josh-gree/wm.git#d7bbe240771e2a2e1d1c4680dfaed1e1829507ad" }
+source = { git = "https://github.com/josh-gree/wm.git#6718e9da2246acd4ffa065d8c05225e3520b9a4a" }
 dependencies = [
     { name = "click" },
+    { name = "gitpython" },
     { name = "modal" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
