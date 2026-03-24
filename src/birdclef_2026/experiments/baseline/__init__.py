@@ -38,7 +38,6 @@ class BirdCLEFBaseline(Experiment):
         max_samples_per_split: int | None = None  # set small (e.g. 64) for a smoke run
         dropout: float = 0.0
         weight_decay: float = 0.0
-        balance_train: bool = False
         resume_from: str | None = None
         use_augmentation: bool = False
 
@@ -65,7 +64,6 @@ class BirdCLEFBaseline(Experiment):
             batch_size=config.batch_size,
             val_fraction=config.val_fraction,
             max_samples_per_split=config.max_samples_per_split,
-            balance_train=config.balance_train,
         )
         n_classes = len(label2idx)
 

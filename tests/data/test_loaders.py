@@ -50,11 +50,11 @@ def make_dataset(tmp_path, clips_per_class: dict[str, int]) -> tuple[str, str, s
 
 
 def train_index(loader) -> pd.DataFrame:
-    return loader.dataset.index
+    return loader.dataset.dataset.index
 
 
 def val_index(loader) -> pd.DataFrame:
-    return loader.dataset.index
+    return loader.dataset.dataset.index
 
 
 # ---------------------------------------------------------------------------
@@ -127,19 +127,17 @@ def test_single_sample_class_goes_to_train(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Balancing
+# Balancing (always on)
 # ---------------------------------------------------------------------------
 
-def test_balance_train_equalises_class_counts(tmp_path):
-    """With balance_train=True every class has the same number of rows in train.
+def test_train_equalises_class_counts(tmp_path):
+    """Train is always balanced — every class has the same number of rows.
 
-    Why: the whole point of balancing is equal class representation per step.
-    We check via value_counts on the train dataset index.
+    Why: equal class representation per step is fixed policy, not opt-in.
     """
-    # "common" has 20 clips, "rare" has 2 — a 10× imbalance
     audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"common": 20, "rare": 2})
     train_loader, _, _ = build_dataloaders(
-        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True
+        audio_path, index_path, taxonomy_path, batch_size=4
     )
 
     counts = train_index(train_loader)["primary_label"].value_counts()
@@ -148,7 +146,7 @@ def test_balance_train_equalises_class_counts(tmp_path):
     )
 
 
-def test_balance_train_target_is_max_class_count(tmp_path):
+def test_train_target_is_max_class_count(tmp_path):
     """The balanced target count equals the largest class's train size.
 
     Why: we oversample minorities up to the majority — not to some arbitrary
@@ -159,7 +157,7 @@ def test_balance_train_target_is_max_class_count(tmp_path):
     # After balancing both classes should have 9 rows in train.
     audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"big": 10, "small": 3})
     train_loader, _, _ = build_dataloaders(
-        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True, val_fraction=0.1
+        audio_path, index_path, taxonomy_path, batch_size=4, val_fraction=0.1
     )
 
     counts = train_index(train_loader)["primary_label"].value_counts()
@@ -168,23 +166,4 @@ def test_balance_train_target_is_max_class_count(tmp_path):
     )
     assert counts["big"] == 9, (
         f"Expected target count of 9 (majority train size), got {counts['big']}"
-    )
-
-
-def test_balance_train_false_does_not_oversample(tmp_path):
-    """With balance_train=False train counts reflect the raw split, not oversampled.
-
-    Why: balancing is opt-in; the default must not silently inflate minority
-    classes and change the effective epoch length.
-    """
-    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"big": 20, "small": 2})
-    train_loader_balanced, _, _ = build_dataloaders(
-        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True
-    )
-    train_loader_raw, _, _ = build_dataloaders(
-        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=False
-    )
-
-    assert len(train_index(train_loader_balanced)) > len(train_index(train_loader_raw)), (
-        "balanced train should be larger than raw train due to oversampling"
     )
