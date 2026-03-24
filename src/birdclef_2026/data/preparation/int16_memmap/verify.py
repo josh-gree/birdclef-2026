@@ -59,6 +59,88 @@ def verify():
     print("All checks passed.")
 
 
+@app.function(
+    image=image,
+    volumes={"/raw": raw_volume, "/processed": processed_volume},
+)
+def verify_soundscapes():
+    audio = np.load("/processed/soundscape_audio.npy", mmap_mode="r")
+    index = pd.read_parquet("/processed/soundscape_index.parquet")
+
+    durations_s = (index["offset_end"] - index["offset_start"]) / 32000
+
+    assert audio.dtype == np.int16, f"expected int16, got {audio.dtype}"
+    assert {"filename", "offset_start", "offset_end", "primary_label"}.issubset(index.columns), "missing index columns"
+    assert (durations_s == 5.0).all(), f"all windows should be exactly 5s (min={durations_s.min():.2f}s, max={durations_s.max():.2f}s)"
+    assert index["offset_end"].iloc[-1] <= len(audio), "last offset exceeds audio length"
+    assert (index["offset_end"].values > index["offset_start"].values).all(), "zero-length clips present"
+
+    # Check that all labels are semicolon-separated strings
+    assert index["primary_label"].str.contains(";").any(), "expected multi-label entries with semicolons"
+
+    # Check no duplicate windows
+    dupes = index.duplicated(subset=["filename", "offset_start", "offset_end"], keep=False)
+    assert not dupes.any(), f"found {dupes.sum()} duplicate windows in index"
+
+    print(f"soundscape_audio.npy: shape={audio.shape}, dtype={audio.dtype}")
+    print(f"soundscape_index.parquet: {len(index)} rows, columns={list(index.columns)}")
+    print(f"unique files: {index['filename'].nunique()}")
+    print(f"duration — min={durations_s.min():.1f}s  median={durations_s.median():.1f}s  max={durations_s.max():.1f}s")
+
+    # Spot-check: decode a few full OGGs and verify the 5s window slices match
+    rng = np.random.default_rng(42)
+    check_indices = [0, len(index) // 2, len(index) - 1] + list(rng.integers(0, len(index), size=3))
+
+    print("Spot-checking memmap windows against raw OGG files...")
+    with zipfile.ZipFile("/raw/birdclef-2026.zip") as zf:
+        decoded_cache = {}
+        for i in check_indices:
+            row = index.iloc[i]
+            if row.filename not in decoded_cache:
+                decoded_cache[row.filename] = decode_to_int16(zf.read(f"train_soundscapes/{row.filename}"))
+            full_audio = decoded_cache[row.filename]
+
+            memmap_window = np.array(audio[row.offset_start : row.offset_end])
+
+            # Find this file's base offset (the start of the first window for this file)
+            file_rows = index[index["filename"] == row.filename]
+            file_base = file_rows["offset_start"].min()
+            local_start = row.offset_start - file_base
+            local_end = row.offset_end - file_base
+            reference = full_audio[local_start:local_end]
+
+            assert np.array_equal(memmap_window, reference), (
+                f"[{i}] {row.filename} window {local_start}-{local_end}: memmap mismatch "
+                f"(memmap len={len(memmap_window)}, ref len={len(reference)})"
+            )
+            print(f"  [{i}] {row.filename} [{local_start}:{local_end}]: OK")
+
+    print("All checks passed.")
+
+
+@app.function(
+    image=image,
+    volumes={"/raw": raw_volume, "/processed": processed_volume},
+)
+def verify_taxonomy():
+    taxonomy = pd.read_csv("/processed/taxonomy.csv")
+
+    assert "primary_label" in taxonomy.columns, "missing primary_label column"
+    assert len(taxonomy) == 234, f"expected 234 classes, got {len(taxonomy)}"
+    assert taxonomy["primary_label"].is_unique, "duplicate labels in taxonomy"
+
+    # Check that all training labels are present in taxonomy
+    index = pd.read_parquet("/processed/index.parquet")
+    train_labels = set(index["primary_label"].unique())
+    taxonomy_labels = set(taxonomy["primary_label"].astype(str))
+    missing = train_labels - taxonomy_labels
+    assert not missing, f"training labels missing from taxonomy: {missing}"
+
+    print(f"taxonomy.csv: {len(taxonomy)} classes")
+    print(f"training data covers {len(train_labels)}/{len(taxonomy_labels)} taxonomy classes")
+    print("All checks passed.")
+
+
 @app.local_entrypoint()
 def main():
     verify.remote()
