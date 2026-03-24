@@ -16,11 +16,11 @@ from birdclef_2026.data.loaders import build_dataloaders
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_dataset(tmp_path, clips_per_class: dict[str, int]) -> tuple[str, str]:
-    """Write a memmap + index with the given number of clips per class.
+def make_dataset(tmp_path, clips_per_class: dict[str, int]) -> tuple[str, str, str]:
+    """Write a memmap + index + taxonomy with the given number of clips per class.
 
     Each clip is exactly WINDOW_SAMPLES long so every clip yields one valid
-    window.  Returns (audio_path, index_path).
+    window.  Returns (audio_path, index_path, taxonomy_path).
     """
     rows = []
     offset = 0
@@ -42,7 +42,11 @@ def make_dataset(tmp_path, clips_per_class: dict[str, int]) -> tuple[str, str]:
 
     index_path = str(tmp_path / "index.parquet")
     pd.DataFrame(rows).to_parquet(index_path, index=False)
-    return audio_path, index_path
+
+    taxonomy_path = str(tmp_path / "taxonomy.csv")
+    pd.DataFrame({"primary_label": list(clips_per_class.keys())}).to_csv(taxonomy_path, index=False)
+
+    return audio_path, index_path, taxonomy_path
 
 
 def train_index(loader) -> pd.DataFrame:
@@ -63,9 +67,9 @@ def test_train_and_val_are_disjoint(tmp_path):
     Why: a leaky split inflates val accuracy and makes metrics meaningless.
     We identify clips by offset_start, which is unique per clip.
     """
-    audio_path, index_path = make_dataset(tmp_path, {"a": 10, "b": 10})
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"a": 10, "b": 10})
     train_loader, val_loader, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4
+        audio_path, index_path, taxonomy_path, batch_size=4
     )
 
     train_offsets = set(train_index(train_loader)["offset_start"])
@@ -80,8 +84,8 @@ def test_every_class_appears_in_val(tmp_path):
 
     Why: if a class is absent from val we cannot measure per-class performance.
     """
-    audio_path, index_path = make_dataset(tmp_path, {"a": 10, "b": 10, "c": 5})
-    _, val_loader, _ = build_dataloaders(audio_path, index_path, batch_size=4)
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"a": 10, "b": 10, "c": 5})
+    _, val_loader, _ = build_dataloaders(audio_path, index_path, taxonomy_path, batch_size=4)
 
     val_labels = set(val_index(val_loader)["primary_label"])
     assert val_labels == {"a", "b", "c"}
@@ -92,8 +96,8 @@ def test_every_class_appears_in_train(tmp_path):
 
     Why: the model cannot learn a class it never sees during training.
     """
-    audio_path, index_path = make_dataset(tmp_path, {"a": 10, "b": 10, "c": 5})
-    train_loader, _, _ = build_dataloaders(audio_path, index_path, batch_size=4)
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"a": 10, "b": 10, "c": 5})
+    train_loader, _, _ = build_dataloaders(audio_path, index_path, taxonomy_path, batch_size=4)
 
     train_labels = set(train_index(train_loader)["primary_label"])
     assert train_labels == {"a", "b", "c"}
@@ -109,9 +113,9 @@ def test_single_sample_class_goes_to_train(tmp_path):
     Why: with only one example we can either train or eval on it, not both.
     We prioritise training so the model at least sees the class.
     """
-    audio_path, index_path = make_dataset(tmp_path, {"common": 10, "rare": 1})
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"common": 10, "rare": 1})
     train_loader, val_loader, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4
+        audio_path, index_path, taxonomy_path, batch_size=4
     )
 
     assert "rare" in set(train_index(train_loader)["primary_label"]), (
@@ -133,9 +137,9 @@ def test_balance_train_equalises_class_counts(tmp_path):
     We check via value_counts on the train dataset index.
     """
     # "common" has 20 clips, "rare" has 2 — a 10× imbalance
-    audio_path, index_path = make_dataset(tmp_path, {"common": 20, "rare": 2})
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"common": 20, "rare": 2})
     train_loader, _, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4, balance_train=True
+        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True
     )
 
     counts = train_index(train_loader)["primary_label"].value_counts()
@@ -153,9 +157,9 @@ def test_balance_train_target_is_max_class_count(tmp_path):
     # "big" has 10 clips. With val_fraction=0.1, n_val=1, so 9 go to train.
     # "small" has 3 clips. n_val=1, so 2 go to train.
     # After balancing both classes should have 9 rows in train.
-    audio_path, index_path = make_dataset(tmp_path, {"big": 10, "small": 3})
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"big": 10, "small": 3})
     train_loader, _, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4, balance_train=True, val_fraction=0.1
+        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True, val_fraction=0.1
     )
 
     counts = train_index(train_loader)["primary_label"].value_counts()
@@ -173,12 +177,12 @@ def test_balance_train_false_does_not_oversample(tmp_path):
     Why: balancing is opt-in; the default must not silently inflate minority
     classes and change the effective epoch length.
     """
-    audio_path, index_path = make_dataset(tmp_path, {"big": 20, "small": 2})
+    audio_path, index_path, taxonomy_path = make_dataset(tmp_path, {"big": 20, "small": 2})
     train_loader_balanced, _, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4, balance_train=True
+        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=True
     )
     train_loader_raw, _, _ = build_dataloaders(
-        audio_path, index_path, batch_size=4, balance_train=False
+        audio_path, index_path, taxonomy_path, batch_size=4, balance_train=False
     )
 
     assert len(train_index(train_loader_balanced)) > len(train_index(train_loader_raw)), (

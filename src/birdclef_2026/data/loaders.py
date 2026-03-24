@@ -5,9 +5,16 @@ from torch.utils.data import DataLoader
 from birdclef_2026.data.dataset import RandomWindowDataset
 
 
+def _label2idx_from_taxonomy(taxonomy_path: str) -> dict[str, int]:
+    """Build canonical label2idx from taxonomy.csv."""
+    labels = pd.read_csv(taxonomy_path)["primary_label"].astype(str).tolist()
+    return {label: i for i, label in enumerate(sorted(labels))}
+
+
 def build_dataloaders(
     audio_path: str,
     index_path: str,
+    taxonomy_path: str,
     batch_size: int,
     val_fraction: float = 0.1,
     max_samples_per_split: int | None = None,
@@ -19,8 +26,7 @@ def build_dataloaders(
     Returns (train_loader, val_loader, label2idx).
     """
     index = pd.read_parquet(index_path)
-    labels = sorted(index["primary_label"].unique())
-    label2idx = {label: i for i, label in enumerate(labels)}
+    label2idx = _label2idx_from_taxonomy(taxonomy_path)
 
     rng = np.random.default_rng(seed)
     val_indices, train_indices_by_label = [], {}

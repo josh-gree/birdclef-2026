@@ -61,6 +61,7 @@ class BirdCLEFBaseline(Experiment):
         train_loader, val_loader, label2idx = build_dataloaders(
             audio_path,
             index_path,
+            taxonomy_path="/data/taxonomy.csv",
             batch_size=config.batch_size,
             val_fraction=config.val_fraction,
             max_samples_per_split=config.max_samples_per_split,
