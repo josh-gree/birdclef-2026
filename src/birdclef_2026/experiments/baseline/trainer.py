@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from birdclef_2026.experiments.baseline.metrics import macro_roc_auc, topk_correct
+from birdclef_2026.experiments.baseline.metrics import macro_roc_auc
 
 
 def train_n_steps(
@@ -80,7 +80,7 @@ def _eval(
 ) -> None:
     model.eval()
     transform.eval()
-    total_loss, correct1, correct5, total = 0.0, 0, 0, 0
+    total_loss, total = 0.0, 0
     all_logits, all_targets = [], []
     with torch.no_grad():
         for waveforms, label_strings in loader:
@@ -90,20 +90,16 @@ def _eval(
             logits = model(images)
             loss = criterion(logits, targets)
             total_loss += loss.item() * len(targets)
-            correct1 += topk_correct(logits, targets, k=1)
-            correct5 += topk_correct(logits, targets, k=5)
             total += len(targets)
             all_logits.append(logits.cpu())
             all_targets.append(targets.cpu())
     roc_auc = macro_roc_auc(torch.cat(all_logits), torch.cat(all_targets), n_classes=len(label2idx))
     metrics = {
         "val_loss": total_loss / total,
-        "val_acc1": correct1 / total,
-        "val_acc5": correct5 / total,
         "val_roc_auc": roc_auc,
         "val_step": val_step,
     }
     print(
-        f"Val {val_step} (step {step}) — val_loss: {metrics['val_loss']:.4f} — acc@1: {metrics['val_acc1']:.4f} — acc@5: {metrics['val_acc5']:.4f} — roc_auc: {roc_auc:.4f}"
+        f"Val {val_step} (step {step}) — val_loss: {metrics['val_loss']:.4f} — roc_auc: {roc_auc:.4f}"
     )
     wandb_run.log(metrics)

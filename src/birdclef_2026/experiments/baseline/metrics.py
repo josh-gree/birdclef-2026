@@ -3,12 +3,6 @@ import torch
 from sklearn.metrics import roc_auc_score
 
 
-def topk_correct(logits: torch.Tensor, targets: torch.Tensor, k: int) -> int:
-    """Number of samples in the batch where the true label appears in the top-k predictions."""
-    topk_indices = logits.topk(k, dim=1).indices
-    return (topk_indices == targets.unsqueeze(1)).any(dim=1).sum().item()
-
-
 def macro_roc_auc(
     all_logits: torch.Tensor,
     all_targets: torch.Tensor,
