@@ -29,6 +29,13 @@ def build_frozen_efficientnet_b3_backbone() -> nn.Module:
     return build_efficientnet_b3_backbone(unfreeze_blocks=0)
 
 
+def build_model(n_classes: int, hidden: int = 0, dropout: float = 0.0, unfreeze_blocks: int = 0) -> nn.Module:
+    """Build the full model: EfficientNet-B3 backbone + classification head."""
+    backbone = build_efficientnet_b3_backbone(unfreeze_blocks=unfreeze_blocks)
+    head = build_head(backbone.num_features, n_classes, dropout=dropout, hidden=hidden)
+    return nn.Sequential(backbone, head)
+
+
 def build_head(in_features: int, n_classes: int, dropout: float = 0.0, hidden: int = 0) -> nn.Module:
     """Classification head: Linear or MLP.
 

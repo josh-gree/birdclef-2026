@@ -14,10 +14,7 @@ from birdclef_2026.data.transforms import (
     TimeMask,
     build_spectrogram_pipeline,
 )
-from birdclef_2026.experiments.baseline.model import (
-    build_efficientnet_b3_backbone,
-    build_head,
-)
+from birdclef_2026.experiments.baseline.model import build_model
 from birdclef_2026.experiments.baseline.trainer import train_n_steps
 
 
@@ -86,13 +83,11 @@ class BirdCLEFBaseline(Experiment):
         )
         transform = nn.Sequential(build_spectrogram_pipeline(), augmentations).to(device)
 
-        backbone = build_efficientnet_b3_backbone(unfreeze_blocks=config.unfreeze_blocks)
-        head = build_head(backbone.num_features, n_classes, config.dropout, config.hidden)
-        model = nn.Sequential(backbone, head).to(device)
+        model = build_model(n_classes, hidden=config.hidden, dropout=config.dropout, unfreeze_blocks=config.unfreeze_blocks).to(device)
 
-        param_groups = [{"params": head.parameters(), "lr": config.lr}]
+        param_groups = [{"params": model[1].parameters(), "lr": config.lr}]
         if config.unfreeze_blocks > 0:
-            backbone_params = [p for p in backbone.parameters() if p.requires_grad]
+            backbone_params = [p for p in model[0].parameters() if p.requires_grad]
             param_groups.append({"params": backbone_params, "lr": config.backbone_lr})
         optimizer = torch.optim.Adam(param_groups, weight_decay=config.weight_decay)
 
