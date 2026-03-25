@@ -8,6 +8,6 @@
   "enable_gpu": false,
   "enable_internet": false,
   "competition_sources": ["birdclef-2026"],
-  "kernel_sources": ["joshgreen/birdclef-2026-wheels"],
+  "kernel_sources": ["joshgreen/birdclef-2026-lib"],
   "dataset_sources": ["joshgreen/birdclef-2026-checkpoint"]
 }

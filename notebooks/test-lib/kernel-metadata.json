@@ -1,13 +1,13 @@
 {
-  "id": "joshgreen/birdclef-2026-test-wheels",
-  "title": "BirdCLEF 2026 Test Wheels",
-  "code_file": "test_wheels.ipynb",
+  "id": "joshgreen/birdclef-2026-test-lib",
+  "title": "BirdCLEF 2026 Test Lib",
+  "code_file": "test_lib.ipynb",
   "language": "python",
   "kernel_type": "notebook",
   "is_private": true,
   "enable_gpu": false,
   "enable_internet": false,
   "competition_sources": [],
-  "kernel_sources": ["joshgreen/birdclef-2026-wheels"],
+  "kernel_sources": ["joshgreen/birdclef-2026-lib"],
   "dataset_sources": []
 }
