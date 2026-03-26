@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import ConcatDataset, DataLoader
 
-from birdclef_2026.data.dataset import FixedWindowDataset, OneHotLabelDataset, RandomWindowDataset
+from birdclef_2026.data.dataset import FixedWindowDataset, MixupDataset, OneHotLabelDataset, RandomWindowDataset
 
 
 def _label2idx_from_taxonomy(taxonomy_path: str) -> dict[str, int]:
@@ -111,6 +111,7 @@ def build_combined_dataloaders(
     batch_size: int,
     val_fraction: float = 0.1,
     soundscape_repeat: int = 5,
+    mixup_repeat: int = 1,
     max_samples_per_split: int | None = None,
     seed: int = 42,
 ) -> tuple[DataLoader, dict[str, DataLoader], dict[str, int]]:
@@ -152,14 +153,19 @@ def build_combined_dataloaders(
         ss_train_indices = ss_train_indices[:max_samples_per_split]
         ss_val_indices = ss_val_indices[:max_samples_per_split]
 
+    mixup_train_indices = sl_train_indices * mixup_repeat
+
     sl_train_ds = OneHotLabelDataset(
         RandomWindowDataset(sl_audio_path, sl_index_path, indices=sl_train_indices), label2idx
     )
     ss_train_ds = OneHotLabelDataset(
         FixedWindowDataset(ss_audio_path, ss_index_path, indices=ss_train_indices), label2idx
     )
+    mixup_train_ds = OneHotLabelDataset(
+        MixupDataset(sl_audio_path, sl_index_path, indices=mixup_train_indices), label2idx
+    )
     train_loader = DataLoader(
-        ConcatDataset([sl_train_ds, ss_train_ds]),
+        ConcatDataset([sl_train_ds, ss_train_ds, mixup_train_ds]),
         batch_size=batch_size,
         shuffle=True,
         num_workers=8,
