@@ -1,0 +1,13 @@
+{
+  "id": "joshgreen/birdclef-2026-deps-nnaudio",
+  "title": "BirdCLEF 2026 Deps nnAudio",
+  "code_file": "deps_nnaudio.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": true,
+  "competition_sources": [],
+  "kernel_sources": [],
+  "dataset_sources": []
+}
