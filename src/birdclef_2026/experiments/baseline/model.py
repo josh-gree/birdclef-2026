@@ -2,6 +2,26 @@ import timm
 import torch.nn as nn
 
 
+def build_vit_base_backbone(unfreeze_blocks: int = 0) -> nn.Module:
+    """ViT-Base/16 backbone with 1-channel input.
+
+    All parameters are frozen by default. With unfreeze_blocks > 0, the last N
+    transformer blocks plus the final norm are unfrozen for fine-tuning.
+    """
+    backbone = timm.create_model(
+        "vit_base_patch16_224", pretrained=True, in_chans=1, num_classes=0, img_size=256
+    )
+    for param in backbone.parameters():
+        param.requires_grad = False
+    if unfreeze_blocks > 0:
+        for block in backbone.blocks[-unfreeze_blocks:]:
+            for param in block.parameters():
+                param.requires_grad = True
+        for param in backbone.norm.parameters():
+            param.requires_grad = True
+    return backbone
+
+
 def build_efficientnet_b3_backbone(unfreeze_blocks: int = 0) -> nn.Module:
     """EfficientNet-B3 backbone with 1-channel input.
 
@@ -32,6 +52,13 @@ def build_frozen_efficientnet_b3_backbone() -> nn.Module:
 def build_model(n_classes: int, hidden: int = 0, dropout: float = 0.0, unfreeze_blocks: int = 0) -> nn.Module:
     """Build the full model: EfficientNet-B3 backbone + classification head."""
     backbone = build_efficientnet_b3_backbone(unfreeze_blocks=unfreeze_blocks)
+    head = build_head(backbone.num_features, n_classes, dropout=dropout, hidden=hidden)
+    return nn.Sequential(backbone, head)
+
+
+def build_vit_model(n_classes: int, hidden: int = 0, dropout: float = 0.0, unfreeze_blocks: int = 0) -> nn.Module:
+    """Build the full model: ViT-Base/16 backbone + classification head."""
+    backbone = build_vit_base_backbone(unfreeze_blocks=unfreeze_blocks)
     head = build_head(backbone.num_features, n_classes, dropout=dropout, hidden=hidden)
     return nn.Sequential(backbone, head)
 
