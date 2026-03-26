@@ -1,6 +1,7 @@
 import itertools
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import torch
 import torch.nn as nn
@@ -14,7 +15,7 @@ from birdclef_2026.data.transforms import (
     TimeMask,
     build_spectrogram_pipeline,
 )
-from birdclef_2026.experiments.baseline.model import build_model
+from birdclef_2026.experiments.baseline.model import build_model, build_vit_model
 from birdclef_2026.experiments.baseline.trainer import train_n_steps
 
 
@@ -34,10 +35,12 @@ class BirdCLEFBaseline(Experiment):
         val_fraction: float = 0.1
         max_samples_per_split: int | None = None  # set small (e.g. 64) for a smoke run
         soundscape_repeat: int = 5
+        mixup_repeat: int = 1
         dropout: float = 0.0
         hidden: int = 512
         weight_decay: float = 0.0
         unfreeze_blocks: int = 0
+        backbone: Literal["efficientnet_b3", "vit_base"] = "efficientnet_b3"
         backbone_lr: float = 1e-5
         resume_from: str | None = None
         use_augmentation: bool = False
@@ -68,6 +71,7 @@ class BirdCLEFBaseline(Experiment):
             batch_size=config.batch_size,
             val_fraction=config.val_fraction,
             soundscape_repeat=config.soundscape_repeat,
+            mixup_repeat=config.mixup_repeat,
             max_samples_per_split=config.max_samples_per_split,
         )
         n_classes = len(label2idx)
@@ -83,7 +87,12 @@ class BirdCLEFBaseline(Experiment):
         )
         transform = nn.Sequential(build_spectrogram_pipeline(), augmentations).to(device)
 
-        model = build_model(n_classes, hidden=config.hidden, dropout=config.dropout, unfreeze_blocks=config.unfreeze_blocks).to(device)
+        if config.backbone == "efficientnet_b3":
+            model = build_model(n_classes, hidden=config.hidden, dropout=config.dropout, unfreeze_blocks=config.unfreeze_blocks).to(device)
+        elif config.backbone == "vit_base":
+            model = build_vit_model(n_classes, hidden=config.hidden, dropout=config.dropout, unfreeze_blocks=config.unfreeze_blocks).to(device)
+        else:
+            raise ValueError(f"Unknown backbone: {config.backbone}")
 
         param_groups = [{"params": model[1].parameters(), "lr": config.lr}]
         if config.unfreeze_blocks > 0:
