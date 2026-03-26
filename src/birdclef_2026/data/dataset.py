@@ -56,6 +56,70 @@ class RandomWindowDataset(Dataset):
         return waveform, row.primary_label
 
 
+class MixupDataset(Dataset):
+    """Dataset that mixes k+1 random 5-second windows with equal weights.
+
+    For each item i, picks a random 5s window from clip i, then samples k
+    additional clips (k drawn uniformly from 1–5) and mixes all k+1 windows
+    with equal weights. Returns a semicolon-joined label string of all unique
+    primary labels, compatible with ``OneHotLabelDataset``.
+
+    Parameters
+    ----------
+    audio_path : str
+        Path to the int16 memmap ``.npy`` file.
+    index_path : str
+        Path to the index parquet file with columns ``offset_start``,
+        ``offset_end``, and ``primary_label``.
+    indices : list of int, optional
+        Row indices into the index to use. If ``None``, all rows are used.
+    seed : int, optional
+        If set, makes window and mix sampling deterministic per item.
+    """
+
+    def __init__(
+        self,
+        audio_path: str,
+        index_path: str,
+        indices: list[int] | None = None,
+        seed: int | None = None,
+    ):
+        self.audio = np.load(audio_path, mmap_mode="r")
+        index = pd.read_parquet(index_path)
+        if indices is not None:
+            index = index.iloc[indices].reset_index(drop=True)
+        self.index = index
+        self.seed = seed
+
+    def _get_window(self, row, rng: np.random.Generator) -> np.ndarray:
+        clip_len = row.offset_end - row.offset_start
+        max_start = clip_len - WINDOW_SAMPLES
+        start = int(rng.integers(0, max_start + 1))
+        return self.audio[row.offset_start + start : row.offset_start + start + WINDOW_SAMPLES].astype(np.float32)
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __getitem__(self, i: int) -> tuple[torch.Tensor, str]:
+        rng = np.random.default_rng(self.seed + i if self.seed is not None else None)
+        k = int(rng.integers(1, 6))
+        other_indices = [j for j in range(len(self.index)) if j != i]
+        chosen = rng.choice(other_indices, size=k, replace=False).tolist()
+        all_indices = [i] + chosen
+
+        mixed = np.zeros(WINDOW_SAMPLES, dtype=np.float32)
+        labels = []
+        for j in all_indices:
+            row = self.index.iloc[j]
+            mixed += self._get_window(row, rng)
+            labels.append(row.primary_label)
+
+        mixed /= len(all_indices)
+        waveform = torch.from_numpy(mixed / 32767.0)
+        label_str = ";".join(dict.fromkeys(labels))  # unique, order-preserving
+        return waveform, label_str
+
+
 class FixedWindowDataset(Dataset):
     """Dataset that returns a fixed 5-second window per row.
 
