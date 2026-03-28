@@ -1,6 +1,7 @@
 import itertools
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import torch
 import torch.nn as nn
@@ -14,7 +15,7 @@ from birdclef_2026.data.transforms import (
     TimeMask,
     build_spectrogram_pipeline,
 )
-from birdclef_2026.experiments.baseline.model import build_model
+from birdclef_2026.experiments.baseline.model import build_model, build_vit_model
 from birdclef_2026.experiments.baseline.trainer import train_n_steps
 
 
@@ -34,13 +35,16 @@ class BirdCLEFBaseline(Experiment):
         val_fraction: float = 0.1
         max_samples_per_split: int | None = None  # set small (e.g. 64) for a smoke run
         soundscape_repeat: int = 5
+        mixup_repeat: int = 1
         dropout: float = 0.0
         hidden: int = 512
         weight_decay: float = 0.0
-        unfreeze_blocks: int = 0
-        backbone_lr: float = 1e-5
+        unfreeze_backbone: bool = False
+        backbone: Literal["efficientnet_b3", "vit_base"] = "efficientnet_b3"
         resume_from: str | None = None
         use_augmentation: bool = False
+        use_schedule: bool = False
+        warmup_fraction: float = 0.25
 
         @model_validator(mode="after")
         def _exactly_one_stopping_criterion(self):
@@ -68,6 +72,7 @@ class BirdCLEFBaseline(Experiment):
             batch_size=config.batch_size,
             val_fraction=config.val_fraction,
             soundscape_repeat=config.soundscape_repeat,
+            mixup_repeat=config.mixup_repeat,
             max_samples_per_split=config.max_samples_per_split,
         )
         n_classes = len(label2idx)
@@ -83,13 +88,22 @@ class BirdCLEFBaseline(Experiment):
         )
         transform = nn.Sequential(build_spectrogram_pipeline(), augmentations).to(device)
 
-        model = build_model(n_classes, hidden=config.hidden, dropout=config.dropout, unfreeze_blocks=config.unfreeze_blocks).to(device)
+        if config.backbone == "efficientnet_b3":
+            model = build_model(n_classes, hidden=config.hidden, dropout=config.dropout).to(device)
+        elif config.backbone == "vit_base":
+            model = build_vit_model(n_classes, hidden=config.hidden, dropout=config.dropout).to(device)
+        else:
+            raise ValueError(f"Unknown backbone: {config.backbone}")
 
-        param_groups = [{"params": model[1].parameters(), "lr": config.lr}]
-        if config.unfreeze_blocks > 0:
-            backbone_params = [p for p in model[0].parameters() if p.requires_grad]
-            param_groups.append({"params": backbone_params, "lr": config.backbone_lr})
-        optimizer = torch.optim.Adam(param_groups, weight_decay=config.weight_decay)
+        if config.unfreeze_backbone:
+            for p in model[0].parameters():
+                p.requires_grad = True
+
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=config.lr,
+            weight_decay=config.weight_decay,
+        )
 
         if config.resume_from:
             print(f"Resuming from {config.resume_from}")
@@ -99,16 +113,32 @@ class BirdCLEFBaseline(Experiment):
 
         criterion = nn.BCEWithLogitsLoss()
 
+        val_every = max(1, int(len(train_loader) * config.val_every_epochs))
+        total_steps = config.total_steps or (config.total_val_rounds * val_every)
+
+        scheduler = None
+        if config.use_schedule:
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=config.lr,
+                total_steps=total_steps,
+                pct_start=config.warmup_fraction,
+                anneal_strategy="cos",
+                div_factor=25,
+                final_div_factor=1e4,
+            )
+
         wandb_run.define_metric("batch_step")
         wandb_run.define_metric("batch_loss", step_metric="batch_step")
         wandb_run.define_metric("mean_pos_logit", step_metric="batch_step")
         wandb_run.define_metric("mean_neg_logit", step_metric="batch_step")
+        if config.use_schedule:
+            wandb_run.define_metric("lr", step_metric="batch_step")
         wandb_run.define_metric("val_step")
         for prefix in ["val_single_label", "val_soundscape"]:
             wandb_run.define_metric(f"{prefix}_loss", step_metric="val_step")
             wandb_run.define_metric(f"{prefix}_roc_auc", step_metric="val_step")
 
-        val_every = max(1, int(len(train_loader) * config.val_every_epochs))
         print(f"val_every={val_every} steps ({config.val_every_epochs} epoch equivalent)")
 
         train_n_steps(
@@ -125,4 +155,5 @@ class BirdCLEFBaseline(Experiment):
             val_every,
             wandb_run,
             run_dir,
+            scheduler=scheduler,
         )

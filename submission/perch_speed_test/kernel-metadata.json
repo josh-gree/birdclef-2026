@@ -1,0 +1,14 @@
+{
+  "id": "joshgreen/birdclef-2026-perch-speed-test",
+  "title": "BirdCLEF 2026 Perch Speed Test",
+  "code_file": "perch_embed_speed_test.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": ["birdclef-2026"],
+  "kernel_sources": [],
+  "dataset_sources": ["joshgreen/birdclef-2026-checkpoint"],
+  "model_sources": ["google/bird-vocalization-classifier/tensorFlow2/bird-vocalization-classifier/8"]
+}

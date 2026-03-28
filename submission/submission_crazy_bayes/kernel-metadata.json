@@ -1,0 +1,13 @@
+{
+  "id": "joshgreen/birdclef-2026-submission-crazy-bayes",
+  "title": "BirdCLEF 2026 Submission Crazy Bayes",
+  "code_file": "submission_crazy_bayes.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": ["birdclef-2026"],
+  "kernel_sources": [],
+  "dataset_sources": []
+}
