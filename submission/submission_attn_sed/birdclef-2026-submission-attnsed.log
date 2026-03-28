@@ -1,0 +1,58 @@
+[{"stream_name":"stderr","time":6.167684421,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.167773614,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.167779727,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.16778344,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":6.775466048,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.775497349,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.77550237,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.775506171,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":8.050176866,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":8.050203231,"data":"  File \"\u003cstring\u003e\", line 1, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":8.05020886,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 131, in execute_notebook\n"}
+,{"stream_name":"stderr","time":8.050327028,"data":"    raise_for_execution_errors(nb, output_path)\n"}
+,{"stream_name":"stderr","time":8.050350829,"data":"  File \"/usr/local/lib/python3.12/dist-packages/papermill/execute.py\", line 251, in raise_for_execution_errors\n"}
+,{"stream_name":"stderr","time":8.050476617,"data":"    raise error\n"}
+,{"stream_name":"stderr","time":8.050710114,"data":"papermill.exceptions.PapermillExecutionError: \n"}
+,{"stream_name":"stderr","time":8.050716522,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":8.050720194,"data":"Exception encountered at \"In [1]\":\n"}
+,{"stream_name":"stderr","time":8.050723728,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":8.050727254,"data":"FileNotFoundError                         Traceback (most recent call last)\n"}
+,{"stream_name":"stderr","time":8.050732838,"data":"/tmp/ipykernel_23/3812739964.py in \u003ccell line: 0\u003e()\n"}
+,{"stream_name":"stderr","time":8.050736823,"data":"      1 import sys, tarfile\n"}
+,{"stream_name":"stderr","time":8.050739419,"data":"      2 \n"}
+,{"stream_name":"stderr","time":8.050741753,"data":"----\u003e 3 with tarfile.open('/kaggle/input/birdclef-2026-nnaudio/nnaudio.tar.gz', 'r:gz') as tar:\n"}
+,{"stream_name":"stderr","time":8.050745914,"data":"      4     tar.extractall('/tmp')\n"}
+,{"stream_name":"stderr","time":8.050748099,"data":"      5 sys.path.insert(0, '/tmp/nnaudio_pkg')\n"}
+,{"stream_name":"stderr","time":8.050750385,"data":"\n"}
+,{"stream_name":"stderr","time":8.050753442,"data":"/usr/lib/python3.12/tarfile.py in open(cls, name, mode, fileobj, bufsize, **kwargs)\n"}
+,{"stream_name":"stderr","time":8.050758801,"data":"   1873             else:\n"}
+,{"stream_name":"stderr","time":8.050762276,"data":"   1874                 raise CompressionError(\"unknown compression type %r\" % comptype)\n"}
+,{"stream_name":"stderr","time":8.050766692,"data":"-\u003e 1875             return func(name, filemode, fileobj, **kwargs)\n"}
+,{"stream_name":"stderr","time":8.050770594,"data":"   1876 \n"}
+,{"stream_name":"stderr","time":8.050774484,"data":"   1877         elif \"|\" in mode:\n"}
+,{"stream_name":"stderr","time":8.050794019,"data":"\n"}
+,{"stream_name":"stderr","time":8.050797647,"data":"/usr/lib/python3.12/tarfile.py in gzopen(cls, name, mode, fileobj, compresslevel, **kwargs)\n"}
+,{"stream_name":"stderr","time":8.05080116,"data":"   1921 \n"}
+,{"stream_name":"stderr","time":8.050804626,"data":"   1922         try:\n"}
+,{"stream_name":"stderr","time":8.050807867,"data":"-\u003e 1923             fileobj = GzipFile(name, mode + \"b\", compresslevel, fileobj)\n"}
+,{"stream_name":"stderr","time":8.050811492,"data":"   1924         except OSError as e:\n"}
+,{"stream_name":"stderr","time":8.050814844,"data":"   1925             if fileobj is not None and mode == 'r':\n"}
+,{"stream_name":"stderr","time":8.050818175,"data":"\n"}
+,{"stream_name":"stderr","time":8.050821396,"data":"/usr/lib/python3.12/gzip.py in __init__(self, filename, mode, compresslevel, fileobj, mtime)\n"}
+,{"stream_name":"stderr","time":8.050824954,"data":"    199         try:\n"}
+,{"stream_name":"stderr","time":8.050828177,"data":"    200             if fileobj is None:\n"}
+,{"stream_name":"stderr","time":8.050831517,"data":"--\u003e 201                 fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')\n"}
+,{"stream_name":"stderr","time":8.050835007,"data":"    202             if filename is None:\n"}
+,{"stream_name":"stderr","time":8.050838453,"data":"    203                 filename = getattr(fileobj, 'name', '')\n"}
+,{"stream_name":"stderr","time":8.050843527,"data":"\n"}
+,{"stream_name":"stderr","time":8.05084631,"data":"FileNotFoundError: [Errno 2] No such file or directory: '/kaggle/input/birdclef-2026-nnaudio/nnaudio.tar.gz'\n"}
+,{"stream_name":"stderr","time":8.050849131,"data":"\n"}
+,{"stream_name":"stderr","time":10.206720939,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":10.206756211,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":10.36085737,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":10.361488126,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":11.037733033,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":11.390916272,"data":"[NbConvertApp] Writing 16745 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":13.818500891,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":14.648569865,"data":"[NbConvertApp] Writing 317222 bytes to __results__.html\n"}
+]
